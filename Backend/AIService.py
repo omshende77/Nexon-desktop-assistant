@@ -107,10 +107,9 @@ Rules:
 # ── Clients Init ──────────────────────────────────────────────────────────────
 
 def _init_clients():
-    print("INIT CLIENTS")
     print("GROQ AVAILABLE:", GROQ_AVAILABLE)
     print("GROQ KEY FOUND:", bool(GROQ_API_KEY))
-    print("GEMINI KEY FOUND:", bool(GEMINI_API_KEY))
+    print("GROQ MODEL:", GROQ_MODEL_NAME)
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
     
@@ -164,7 +163,7 @@ def _history_to_groq_format(gemini_history: list[dict]) -> list[dict]:
 async def _stream_gemini_fallback(query: str, thread_id: str) -> AsyncGenerator[str, None]:
     """Stream via Gemini if Groq fails."""
     if not GEMINI_API_KEY:
-        yield "\n\n⚠️ Groq failed and Gemini fallback is not configured."
+        yield f"GROQ FAILED. KEY PRESENT={bool(GROQ_API_KEY)}"
         return
 
     history = get_thread_history(thread_id)
@@ -211,6 +210,7 @@ async def stream_chat_response(
 
     # 1. Try Groq first (lightning fast, reliable)
     if groq_client:
+        print("USING GROQ")
         groq_messages = [{"role": "system", "content": get_system_prompt()}] + _history_to_groq_format(chat_history)
         groq_messages.append({"role": "user", "content": query})
 
@@ -238,6 +238,7 @@ async def stream_chat_response(
 
         except Exception as e:
             print(f"[AIService] Groq stream failed ({e}), falling back to Gemini.")
+            print("GROQ ERROR:", str(e))
             yield "[FALLBACK_TRIGGERED]"
 
     # 2. Fallback to Gemini
