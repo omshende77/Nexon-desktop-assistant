@@ -1,0 +1,42 @@
+# ── Core AI (Primary provider) ────────────────────────────────────────────────
+google-generativeai>=0.8.0     # Gemini API — SOLE AI provider
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv
+requests
+rich
+
+# ── Voice (TTS) ───────────────────────────────────────────────────────────────
+edge-tts
+pygame
+
+# ── Image Generation ──────────────────────────────────────────────────────────
+pillow
+
+# ── Web Search & Automation (optional, desktop-only features) ─────────────────
+AppOpener
+pywhatkit
+bs4
+googlesearch-python
+selenium
+webdriver-manager
+keyboard
+mtranslate
+
+# ── Web server ────────────────────────────────────────────────────────────────
+fastapi
+uvicorn[standard]
+websockets
+
+# ── Database ──────────────────────────────────────────────────────────────────
+sqlalchemy
+psycopg2-binary
+alembic
+
+
+# ── Desktop GUI (legacy desktop app — not used by web server) ─────────────────
+PyQt5
+
+# ── REMOVED (replaced by Gemini) ──────────────────────────────────────────────
+# groq           ← was used for LLaMA chat generation
+# cohere         ← was used for query classification (DMM)
