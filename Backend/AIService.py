@@ -17,7 +17,9 @@ import google.generativeai as genai
 try:
     from groq import Groq
     GROQ_AVAILABLE = True
-except ImportError:
+    print("GROQ IMPORT SUCCESS")
+except Exception as e:
+    print("GROQ IMPORT ERROR:", e)
     GROQ_AVAILABLE = False
 
 # ── Configuration ─────────────────────────────────────────────────────────────
