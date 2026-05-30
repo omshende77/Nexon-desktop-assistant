@@ -1,5 +1,6 @@
 # ── Core AI (Primary provider) ────────────────────────────────────────────────
 google-generativeai>=0.8.0     # Gemini API — SOLE AI provider
+groq
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 python-dotenv
