@@ -7,6 +7,7 @@ Dynamic Model Routing:
 """
 
 import asyncio
+import os
 from typing import AsyncGenerator
 from dotenv import dotenv_values
 
@@ -23,10 +24,25 @@ except ImportError:
 
 env_vars = dotenv_values(".env")
 
-GEMINI_API_KEY    = env_vars.get("GEMINI_API_KEY", "")
-GROQ_API_KEY      = env_vars.get("GroqAPIKey", "")
-USERNAME          = env_vars.get("Username", "User")
-ASSISTANT_NAME    = env_vars.get("Assistantname", "Nexon")
+GEMINI_API_KEY = os.getenv(
+    "GEMINI_API_KEY",
+    env_vars.get("GEMINI_API_KEY", "")
+)
+
+GROQ_API_KEY = os.getenv(
+    "GroqAPIKey",
+    env_vars.get("GroqAPIKey", "")
+)
+
+USERNAME = os.getenv(
+    "Username",
+    env_vars.get("Username", "User")
+)
+
+ASSISTANT_NAME = os.getenv(
+    "Assistantname",
+    env_vars.get("Assistantname", "Nexon")
+)
 
 # Models
 GROQ_MODEL_NAME       = "llama-3.3-70b-versatile"
