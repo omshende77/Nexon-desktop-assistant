@@ -107,6 +107,10 @@ Rules:
 # ── Clients Init ──────────────────────────────────────────────────────────────
 
 def _init_clients():
+    print("INIT CLIENTS")
+    print("GROQ AVAILABLE:", GROQ_AVAILABLE)
+    print("GROQ KEY FOUND:", bool(GROQ_API_KEY))
+    print("GEMINI KEY FOUND:", bool(GEMINI_API_KEY))
     if GEMINI_API_KEY:
         genai.configure(api_key=GEMINI_API_KEY)
     
@@ -196,6 +200,10 @@ async def stream_chat_response(
     username: str = None,
     assistantname: str = None,
 ) -> AsyncGenerator[str, None]:
+    print("STREAM_CHAT_RESPONSE CALLED")
+    print("GROQ CLIENT:", groq_client)
+    print("GROQ KEY:", bool(GROQ_API_KEY))
+    print("GEMINI KEY:", bool(GEMINI_API_KEY))
     
     append_to_thread(thread_id, "user", query)
     history = get_thread_history(thread_id)
