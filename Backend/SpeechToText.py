@@ -73,8 +73,13 @@ chrome_options.add_argument("--use-fake-device-for-media-stream")
 # chrome_options.add_argument("--headless=new")
 
 # Start driver
-service = Service(r"C:\Users\acer\Desktop\Nexon Ai\drivers\chromedriver.exe")
-driver = webdriver.Chrome(service=service, options=chrome_options)
+# service = Service(r"C:\Users\acer\Desktop\Nexon Ai\drivers\chromedriver.exe")
+# driver = webdriver.Chrome(service=service, options=chrome_options)
+
+chrome_options = Options()
+chrome_options.add_argument("--start-maximized")
+
+driver = webdriver.Chrome(options=chrome_options)
 
 # Temporary files path
 TempDirPath = rf"{current_dir}/Frontend/Files"

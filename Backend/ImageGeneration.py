@@ -61,20 +61,24 @@ def GenerateImages(prompt: str):
     open_images(prompt)
 
 # Monitor file and generate images on request
-while True:
-    try:
-        with open(r"Frontend\Files\ImageGeneration.data", "r") as f:
-            data: str = f.read()
-            prompt, status = data.split(",")
+# NOTE: Wrapped in __main__ guard so this module can be safely imported
+# by FastAPI (server.py) without blocking. The desktop app runs this
+# as a subprocess (python Backend\ImageGeneration.py) so __main__ still fires.
+if __name__ == "__main__":
+    while True:
+        try:
+            with open(r"Frontend\Files\ImageGeneration.data", "r") as f:
+                data: str = f.read()
+                prompt, status = data.split(",")
 
-            if status == "True":
-                print("Generating Images...")
-                imgstatus = GenerateImages(prompt=prompt)
+                if status == "True":
+                    print("Generating Images...")
+                    imgstatus = GenerateImages(prompt=prompt)
 
-                with open(r"Frontend\Files\ImageGeneration.data","w") as f:
-                    f.write("False, False")
-                    break
-            else:
-                sleep(1)
-    except:
-        pass
+                    with open(r"Frontend\Files\ImageGeneration.data", "w") as f:
+                        f.write("False, False")
+                        break
+                else:
+                    sleep(1)
+        except:
+            pass

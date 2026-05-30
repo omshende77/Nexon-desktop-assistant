@@ -1,96 +1,99 @@
-from groq import Groq
-from json import load, dump
-import datetime
-from dotenv import dotenv_values
+"""
+Chatbot.py — Gemini-powered chat response generator.
 
-# Load environment variables from the .env file
-env_vars = dotenv_values(".env")
-Username = env_vars.get("Username")
-Assistantname = env_vars.get("Assistantname")
-GroqAPIKey = env_vars.get("GroqAPIKey")
+MIGRATION NOTE:
+  Previously used Groq (LLaMA 3.3 70B).
+  Now uses Gemini via the centralized AIService layer.
+  To swap models again, edit Backend/AIService.py → MODEL_NAME only.
 
-# Initialize the Groq client using the provided API key
-client = Groq(api_key=GroqAPIKey)
-
-# Initialize an empty list to store chat messages
-messages = []
-
-# Define a system message that provides context to the AI
-System = f"""Hello, I am {Username}, You are a very accurate and advanced AI chatbot named {Assistantname} which also has real-time up-to-date information from the internet.
-*** Do not tell time until I ask, do not talk too much, just answer the question.***
-*** Reply in only English, even if the question is in Hindi, reply in English.***
-*** Do not provide notes in the output, just answer the question and never mention your training data. ***
+Public API (unchanged, preserving backward compatibility):
+  ChatBot(Query)            — synchronous, returns full answer string
+  ChatBotStream(Query, thread_id) — async generator, yields tokens
 """
 
-SystemChatBot = [
-    {"role": "system", "content": System}
+import asyncio
+from dotenv import dotenv_values
+from Backend.AIService import (
+    stream_chat_response,
+    get_chat_response,
+    append_to_thread,
+    get_thread_history,
+    clear_thread_history,
+    load_thread_history_from_messages,
+    classify_query,
+    ASSISTANT_NAME,
+    USERNAME,
+)
+
+env_vars = dotenv_values(".env")
+Username      = env_vars.get("Username",      USERNAME)
+Assistantname = env_vars.get("Assistantname", ASSISTANT_NAME)
+
+# Default thread for legacy synchronous callers (desktop app compat)
+_DEFAULT_THREAD = "default"
+
+
+def ChatBot(Query: str, thread_id: str = _DEFAULT_THREAD) -> str:
+    """
+    Synchronous chat — blocks until Gemini returns the full response.
+    
+    Preserves backward-compatible interface for any code that calls ChatBot().
+    Internally uses Gemini via AIService.
+    """
+    try:
+        return asyncio.run(_async_chatbot(Query, thread_id))
+    except RuntimeError:
+        # Already inside an event loop (e.g., called from FastAPI)
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(_async_chatbot(Query, thread_id))
+
+
+async def _async_chatbot(Query: str, thread_id: str) -> str:
+    """Internal async wrapper."""
+    return await get_chat_response(
+        query=Query,
+        thread_id=thread_id,
+        username=Username,
+        assistantname=Assistantname,
+    )
+
+
+async def ChatBotStream(Query: str, thread_id: str = _DEFAULT_THREAD):
+    """
+    Async generator — yields Gemini response tokens one by one.
+    
+    Usage:
+        async for token in ChatBotStream(query, thread_id):
+            await ws.send_json({"type": "token", "content": token})
+    """
+    async for token in stream_chat_response(
+        query=Query,
+        thread_id=thread_id,
+        username=Username,
+        assistantname=Assistantname,
+    ):
+        yield token
+
+
+# Re-export history helpers for convenience
+__all__ = [
+    "ChatBot",
+    "ChatBotStream",
+    "append_to_thread",
+    "get_thread_history",
+    "clear_thread_history",
+    "load_thread_history_from_messages",
 ]
 
-try:
-    with open(r"Data\ChatLog.json", "r") as f:
-        messages = load(f)
-except FileNotFoundError:
-    with open(r"Data\ChatLog.json", "w") as f:
-        dump([], f)
-
-def RealtimeInformation():
-    current_date_time = datetime.datetime.now()
-    day = current_date_time.strftime("%A")
-    date = current_date_time.strftime("%d")
-    month = current_date_time.strftime("%B")
-    year = current_date_time.strftime("%Y")
-    hour = current_date_time.strftime("%H")
-    minute = current_date_time.strftime("%M")
-    second = current_date_time.strftime("%S")
-
-    data = "Please use this real-time information if needed,\n"
-    data += f"Day: {day}\nDate: {date}\nMonth: {month}\nYear: {year}\n"
-    data += f"Time: {hour} hours: {minute} minutes: {second} seconds.\n"
-    return data
-
-def AnswerModifier(Answer):
-    lines = Answer.split('\n')
-    non_empty_lines = [line for line in lines if line.strip()]
-    modified_answer = '\n'.join(non_empty_lines)
-    return modified_answer
-
-def ChatBot(Query):
-    try:
-        with open("Data\\ChatLog.json", "r") as f:
-            messages = load(f)
-
-        messages.append({"role": "user", "content": f"{Query}"})
-
-        completion = client.chat.completions.create(
-            model="llama3-70b-8192",
-            messages=SystemChatBot + [{"role": "system", "content": RealtimeInformation()}] + messages,
-            max_tokens=1024,
-            temperature=0.7,
-            top_p=1,
-            stream=True,
-            stop=None
-        )
-
-        Answer = ""
-        for chunk in completion:
-            if chunk.choices[0].delta.content:
-                Answer += chunk.choices[0].delta.content
-
-        Answer = Answer.replace("</s>", "")
-        messages.append({"role": "assistant", "content": Answer})
-
-        with open(r"Data\ChatLog.json", "w") as f:
-            dump(messages, f, indent=4)
-
-        return AnswerModifier(Answer)
-
-    except Exception as e:
-        print(f"Error: {e}")
-        with open(r"Data\ChatLog.json", "w") as f:
-            dump([], f, indent=4)
-        return ChatBot(Query)
 
 if __name__ == "__main__":
+    print(f"Nexon AI Chatbot — powered by Gemini")
+    print(f"Assistant: {Assistantname} | User: {Username}")
+    print("Type 'exit' to quit.\n")
     while True:
-        user_input = input("Enter Your Question: ")
-        print(ChatBot(user_input))
+        user_input = input("You: ").strip()
+        if user_input.lower() in ("exit", "quit", "bye"):
+            break
+        if user_input:
+            answer = ChatBot(user_input)
+            print(f"{Assistantname}: {answer}\n")
