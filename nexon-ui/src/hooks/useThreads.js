@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 
 const STORAGE_KEY = 'nexon_threads'
 
-export function useThreads() {
+export function useThreads(token) {
   const [threads, setThreads] = useState([])
   const [activeThreadId, setActiveThreadId] = useState(null)
   const [activeMessages, setActiveMessages] = useState([])
@@ -10,8 +10,11 @@ export function useThreads() {
   // Try to load from API first, fallback to localStorage
   useEffect(() => {
     const init = async () => {
+      if (!token) return;
       try {
-        const res = await fetch('/api/conversations')
+        const res = await fetch('/api/conversations', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
         if (res.ok) {
           const data = await res.json()
           if (data.status === 'persistent') {
@@ -44,7 +47,10 @@ export function useThreads() {
     try {
       const res = await fetch('/api/conversations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ title: 'New Chat' })
       })
       if (res.ok) {
@@ -88,7 +94,9 @@ export function useThreads() {
     }
 
     try {
-      const res = await fetch(`/api/conversations/${threadId}/messages`)
+      const res = await fetch(`/api/conversations/${threadId}/messages`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
       if (res.ok) {
         const data = await res.json()
         if (data.status === 'persistent') {
@@ -133,7 +141,10 @@ export function useThreads() {
   const deleteThread = useCallback(async (threadId) => {
     try {
       if (!String(threadId).startsWith('thread_')) {
-        await fetch(`/api/conversations/${threadId}`, { method: 'DELETE' })
+        await fetch(`/api/conversations/${threadId}`, { 
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
       }
     } catch (e) {}
 
@@ -153,7 +164,10 @@ export function useThreads() {
       if (!String(threadId).startsWith('thread_')) {
         await fetch(`/api/conversations/${threadId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
           body: JSON.stringify({ title: newTitle })
         })
       }

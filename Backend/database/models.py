@@ -3,10 +3,21 @@ from sqlalchemy.sql import func
 from .config import Base
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id              = Column(Integer, primary_key=True, index=True)
+    username        = Column(String(50), unique=True, index=True, nullable=False)
+    email           = Column(String(100), unique=True, index=True, nullable=True)
+    hashed_password = Column(String(255), nullable=False)
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+
 class Conversation(Base):
     __tablename__ = "conversations"
 
     id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True) # nullable for backwards compatibility initially, or we set a default
     title      = Column(String(255), nullable=False, default="New Chat")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

@@ -145,12 +145,27 @@ class NexonCore:
                          .replace("generate", "")
                          .strip()
                     )
+                    if is_voice:
+                        await self.broadcast({"type": "status", "value": "Speaking..."})
+                        await self.generate_tts("Generating your image, let's head over to the chat section to see it.")
+                    
                     await self.broadcast({"type": "status", "value": "Generating image..."})
                     try:
                         from Backend.ImageGeneration import GenerateImages
                         await loop.run_in_executor(None, GenerateImages, image_prompt)
                         safe = image_prompt.replace(" ", "_")
-                        image_urls = [f"/data/{safe}{i}.jpg" for i in range(1, 5)]
+                        image_urls = [f"/data/{safe}1.jpg"]
+                        
+                        if DB_AVAILABLE and thread_id and thread_id != "default":
+                            try:
+                                db = SessionLocal()
+                                msg_service = MessageService()
+                                content = "Here is your generated image:\n\n" + "\n".join([f"![Image]({url})" for url in image_urls])
+                                msg_service.add_message(db, int(thread_id), "assistant", content)
+                                db.close()
+                            except Exception as e:
+                                pass
+
                         await self.broadcast({
                             "type":     "images_ready",
                             "images":   image_urls,
@@ -370,4 +385,15 @@ def _strip_markdown_for_tts(text: str) -> str:
     text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
     # Collapse multiple whitespace/newlines
     text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    text = text.strip()
+    
+    # Truncate if too long (more than 12 sentences) to prevent endless talking
+    sentences = re.split(r'(?<=[.!?])\s+|\n+', text)
+    # Filter out empty strings from the split
+    sentences = [s.strip() for s in sentences if s.strip()]
+    
+    if len(sentences) > 12:
+        text = " ".join(sentences[:12]).strip()
+        text += " You can check the remaining in the chats section."
+        
+    return text

@@ -73,6 +73,12 @@ export function useSpeechRecognition() {
 
     rec.onend = () => {
       setInterimText('')
+      
+      // Prevent old instances from restarting if a new one took over
+      if (recognitionRef.current !== rec) {
+        return
+      }
+
       // Important: Only restart if we are in continuous mode AND explicitly requested to restart.
       // This prevents the silent crashes and duplicate instances.
       if (shouldRestartRef.current && continuousModeRef.current) {
@@ -151,9 +157,6 @@ export function useSpeechRecognition() {
   const resumeListening = useCallback((lang = 'en-US') => {
     if (!isSupported || !continuousModeRef.current) return
     
-    // Safety check: if already listening, don't spin up another instance
-    if (isListening) return
-
     shouldRestartRef.current = true
     langRef.current          = lang
     

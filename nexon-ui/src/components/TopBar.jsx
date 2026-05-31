@@ -19,9 +19,11 @@ export default function TopBar({
   config,
   onSidebarToggle,
   onNewChat,
+  user,
+  onLogout
 }) {
   const assistantname = config?.assistantname ?? 'Nexon'
-  const username      = config?.username      ?? 'User'
+  const username      = user?.username ?? config?.username ?? 'User'
 
   return (
     <header className="relative z-20 flex items-center justify-between px-4 py-3 glass border-b border-white/5 shrink-0">
@@ -98,14 +100,22 @@ export default function TopBar({
         })}
       </nav>
 
-      {/* ── Right: New Chat + user badge ─────────────────────────────────── */}
+      {/* ── Right: user badge and logout ─────────────────────────────────── */}
       <div className="flex items-center gap-2 min-w-[160px] justify-end">
-
-
         <span className="text-sm text-slate-400 hidden lg:block">{username}</span>
         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center font-bold text-white text-sm shadow-lg">
           {username[0]?.toUpperCase() ?? 'U'}
         </div>
+        {user && (
+          <motion.button
+            onClick={onLogout}
+            className="ml-2 text-xs text-red-400 hover:text-red-300 transition-colors"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Logout
+          </motion.button>
+        )}
       </div>
     </header>
   )

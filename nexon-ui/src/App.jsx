@@ -7,7 +7,9 @@ import ThreadSidebar from './components/ThreadSidebar.jsx'
 import { useWebSocket } from './hooks/useWebSocket.js'
 import { useThreads } from './hooks/useThreads.js'
 import { useVoiceSession } from './hooks/useVoiceSession.js'
-
+import { useAuth } from './hooks/useAuth.js'
+import LoginScreen from './components/LoginScreen.jsx'
+import SignupScreen from './components/SignupScreen.jsx'
 /**
  * Derive the correct WebSocket URL regardless of deployment environment.
  * - Dev (Vite proxy): ws://localhost:5173/ws → proxied to ws://localhost:8000/ws
@@ -34,6 +36,8 @@ const PAGE_VARIANTS = {
 }
 
 export default function App() {
+  const { user, token, loading, login, register, logout } = useAuth();
+  
   const [activeScreen, setActiveScreen] = useState('home')
 
   // Sidebar: open by default on desktop (≥1024px), closed on mobile
@@ -49,7 +53,7 @@ export default function App() {
     appendMessage,
     deleteThread,
     renameThread,
-  } = useThreads()
+  } = useThreads(token)
 
   // Use refs to expose latest versions to callbacks defined before they exist
   const activeThreadIdRef = useRef(activeThreadId)
@@ -120,6 +124,13 @@ export default function App() {
     }, []),
   })
 
+  // Resume listening if backend finished processing without TTS
+  useEffect(() => {
+    if (status === 'Available...') {
+      voiceSessionRef.current?.notifyProcessingComplete?.()
+    }
+  }, [status])
+
   // Expose sendQuery to voice session via ref (avoids circular hook dependency)
   sendQueryRef.current = sendQuery
 
@@ -167,6 +178,30 @@ export default function App() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  if (loading) {
+    return <div className="h-screen flex items-center justify-center bg-[#080810] text-white">Loading...</div>;
+  }
+
+  if (!user && activeScreen !== 'signup') {
+    return (
+      <div className="h-screen flex overflow-hidden bg-[#080810] relative">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <LoginScreen onLogin={login} onNavigateToSignup={() => setActiveScreen('signup')} />
+      </div>
+    );
+  }
+
+  if (!user && activeScreen === 'signup') {
+    return (
+      <div className="h-screen flex overflow-hidden bg-[#080810] relative">
+        <div className="orb orb-1" />
+        <div className="orb orb-2" />
+        <SignupScreen onSignup={register} onNavigateToLogin={() => setActiveScreen('login')} />
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen flex overflow-hidden bg-[#080810] relative">
       {/* Background ambient orbs */}
@@ -196,6 +231,8 @@ export default function App() {
           onSidebarToggle={handleSidebarToggle}
           onNewChat={handleNewChat}
           isSidebarOpen={sidebarOpen}
+          user={user}
+          onLogout={logout}
         />
 
         {/* Dynamic Screen Content */}

@@ -21,9 +21,13 @@ export default function ChatScreen({
   isVoiceSessionActive,
   threadTitle,
 }) {
-  const bottomRef    = useRef(null)
-  const audioRef     = useRef(null)
-  const isProcessing = status !== 'Available...' && status !== 'Connecting...'
+  const bottomRef       = useRef(null)
+  const audioRef        = useRef(null)
+  // Track the last ttsReady counter value we actually played.
+  // Initialise to the CURRENT value so that on mount we skip any
+  // TTS events that already fired while this screen was unmounted.
+  const lastPlayedRef   = useRef(ttsReady)
+  const isProcessing    = status !== 'Available...' && status !== 'Connecting...'
 
   /* ── Auto-scroll ─────────────────────────────────────────────────────── */
   useEffect(() => {
@@ -32,8 +36,12 @@ export default function ChatScreen({
 
   /* ── TTS fallback playback (only when voice session is NOT active) ────── */
   useEffect(() => {
-    if (!ttsReady || isVoiceSessionActive) return
+    // Skip if voice session is handling TTS
+    if (isVoiceSessionActive) return
+    // Skip if this is not a NEW tts event (prevents replay on re-mount)
+    if (ttsReady === 0 || ttsReady <= lastPlayedRef.current) return
 
+    lastPlayedRef.current = ttsReady
     let isCancelled = false
 
     if (audioRef.current) {

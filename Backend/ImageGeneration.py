@@ -25,28 +25,21 @@ def open_images(prompt):
         except IOError:
             print(f"Unable to open {image_path}")
 
-# Hugging Face API configuration
-API_URL = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
-headers = {
-    "Authorization": f"Bearer {get_key('.env', 'HuggingFaceAPIKey')}"
-}
-
-# Async function to send request to Hugging Face
-async def query(payload):
-    response = await asyncio.to_thread(
-        requests.post, API_URL, headers=headers, json=payload
-    )
+# Using Pollinations AI which is free, fast, and requires no API keys
+async def fetch_image(prompt: str, seed: int):
+    # Format the prompt for the URL
+    url_prompt = requests.utils.quote(f"{prompt}, quality=4K, sharpness=maximum, Ultra High details, high resolution")
+    url = f"https://image.pollinations.ai/prompt/{url_prompt}?seed={seed}&width=1024&height=1024&nologo=True"
+    
+    response = await asyncio.to_thread(requests.get, url)
     return response.content
 
-# Async function to generate 4 images based on prompt
 async def generate_images(prompt: str):
     tasks = []
 
-    for _ in range(4):
-        payload = {
-            "inputs": f"{prompt}, quality=4K, sharpness=maximum, Ultra High details, high resolution, seed={randint(0, 1000000)}"
-        }
-        task = asyncio.create_task(query(payload))
+    for _ in range(1):
+        seed = randint(0, 1000000)
+        task = asyncio.create_task(fetch_image(prompt, seed))
         tasks.append(task)
 
     image_bytes_list = await asyncio.gather(*tasks)
@@ -58,7 +51,7 @@ async def generate_images(prompt: str):
 # Wrapper to handle full image generation process
 def GenerateImages(prompt: str):
     asyncio.run(generate_images(prompt))
-    open_images(prompt)
+    # open_images(prompt) # Disabled to prevent opening windows on the server OS
 
 # Monitor file and generate images on request
 # NOTE: Wrapped in __main__ guard so this module can be safely imported

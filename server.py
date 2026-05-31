@@ -60,6 +60,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from Backend.auth_routes import router as auth_router, get_current_user
+from Backend.database.models import User
+app.include_router(auth_router)
+
 # ── Static File Mounts ────────────────────────────────────────────────────────
 
 GRAPHICS_DIR = Path("Frontend/Graphics")
@@ -220,43 +224,44 @@ async def get_status():
 # ── Database Endpoints ────────────────────────────────────────────────────────
 
 @app.get("/api/conversations")
-def get_conversations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_conversations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not DB_AVAILABLE:
         return {"conversations": [], "status": "ephemeral"}
     service = ConversationService()
-    convos = service.get_all_conversations(db)
+    convos = service.get_all_conversations(db, current_user.id)
     return {"conversations": [{"id": c.id, "title": c.title, "created_at": c.created_at, "updated_at": c.updated_at} for c in convos], "status": "persistent"}
 
 @app.post("/api/conversations")
-def create_conversation(req: ConversationCreateRequest, db: Session = Depends(get_db)):
+def create_conversation(req: ConversationCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not DB_AVAILABLE:
         return {"id": "default", "title": req.title, "status": "ephemeral"}
     service = ConversationService()
-    c = service.create_conversation(db, req.title)
+    c = service.create_conversation(db, req.title, current_user.id)
     return {"id": c.id, "title": c.title, "created_at": c.created_at, "updated_at": c.updated_at}
 
 @app.get("/api/conversations/{conversation_id}/messages")
-def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db)):
+def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not DB_AVAILABLE or conversation_id == "default":
         return {"messages": [], "status": "ephemeral"}
     service = MessageService()
+    # TODO: ideally verify that this conversation belongs to the user
     msgs = service.get_conversation_history(db, int(conversation_id))
     return {"messages": [{"id": m.id, "role": m.role, "content": m.content, "type": m.message_type, "created_at": m.created_at} for m in msgs], "status": "persistent"}
 
 @app.put("/api/conversations/{conversation_id}")
-def update_conversation(conversation_id: str, req: ConversationUpdateRequest, db: Session = Depends(get_db)):
+def update_conversation(conversation_id: str, req: ConversationUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not DB_AVAILABLE or conversation_id == "default":
         return {"status": "ephemeral"}
     service = ConversationService()
-    c = service.update_title(db, int(conversation_id), req.title)
+    c = service.update_title(db, int(conversation_id), req.title, current_user.id)
     return {"id": c.id, "title": c.title, "updated_at": c.updated_at}
 
 @app.delete("/api/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db)):
+def delete_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     if not DB_AVAILABLE or conversation_id == "default":
         return {"status": "ephemeral"}
     service = ConversationService()
-    service.delete_conversation(db, int(conversation_id))
+    service.delete_conversation(db, int(conversation_id), current_user.id)
     from Backend.AIService import clear_thread_history
     clear_thread_history(conversation_id)
     return {"status": "deleted", "id": conversation_id}

@@ -37,6 +37,7 @@ export function useVoiceSession({ onQuery, onNavigate }) {
 
   const sessionRef      = useRef(false)
   const processingRef   = useRef(false)
+  const inactivityTimerRef = useRef(null)
 
   // Initialize a persistent Audio object for playback to bypass Autoplay restrictions
   const audioRef = useRef(null)
@@ -111,6 +112,18 @@ export function useVoiceSession({ onQuery, onNavigate }) {
     pauseListening()
   }, [pauseListening])
 
+  // ── Called when processing finishes without TTS ───────────────────────────
+  const notifyProcessingComplete = useCallback(() => {
+    if (!sessionRef.current) return
+    setVoiceState(prev => {
+      if (prev === 'processing') {
+        resumeListening('en-US')
+        return 'listening'
+      }
+      return prev
+    })
+  }, [resumeListening])
+
   // ── Called when AI text response arrives ──────────────────────────────────
   const notifyResponse = useCallback((text) => {
     setLastResponse(text)
@@ -155,17 +168,38 @@ export function useVoiceSession({ onQuery, onNavigate }) {
     processingRef.current = false
     stopListening()
 
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current)
+      inactivityTimerRef.current = null
+    }
+
     if (audioRef.current) {
       audioRef.current.pause()
       audioRef.current.src = ''
     }
   }, [stopListening])
 
+  // ── Inactivity Timeout ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (isSessionActive) {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+      
+      // Stop session after 6 minutes of inactivity (360,000 ms)
+      inactivityTimerRef.current = setTimeout(() => {
+        console.log('[VoiceSession] Session inactive for 6 minutes, stopping.')
+        stopSession()
+      }, 360000)
+    } else {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
+    }
+  }, [isSessionActive, transcript, interimText, voiceState, stopSession])
+
   // ── Cleanup on unmount ────────────────────────────────────────────────────
   useEffect(() => {
     return () => {
       sessionRef.current = false
       stopListening()
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current)
       if (audioRef.current) {
         audioRef.current.pause()
         audioRef.current.src = ''
@@ -184,6 +218,7 @@ export function useVoiceSession({ onQuery, onNavigate }) {
     startSession,
     stopSession,
     notifyProcessing,
+    notifyProcessingComplete,
     notifyResponse,
     notifyTtsReady,
   }

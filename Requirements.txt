@@ -33,6 +33,12 @@ sqlalchemy
 psycopg2-binary
 alembic
 
+# ── Authentication ────────────────────────────────────────────────────────────
+passlib[bcrypt]
+bcrypt<4.0.0
+pyjwt
+python-multipart
+
 
 # ── Desktop GUI (legacy desktop app — not used by web server) ─────────────────
 PyQt5
