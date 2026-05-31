@@ -29,7 +29,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
  *   { type: 'delete_thread', thread_id: string }
  *   { type: 'ping' }
  */
-export function useWebSocket(url, {
+export function useWebSocket(url, token, {
   onAppendMessage,     // (message) => void
   onStreamToken,       // (token, thread_id) => void  ← NEW
   onStreamComplete,    // (thread_id) => void          ← NEW
@@ -209,6 +209,10 @@ export function useWebSocket(url, {
         setConnected(true)
         clearTimeout(reconnectRef.current)
 
+        if (token) {
+          ws.send(JSON.stringify({ type: 'auth', token }))
+        }
+
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping' }))
@@ -242,7 +246,7 @@ export function useWebSocket(url, {
         reconnectRef.current = setTimeout(connect, 3000)
       }
     }
-  }, [url, handleMessage])
+  }, [url, token, handleMessage])
 
   useEffect(() => {
     isUnmounted.current = false

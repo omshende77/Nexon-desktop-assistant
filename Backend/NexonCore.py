@@ -79,6 +79,7 @@ class NexonCore:
         assistantname: str = None,
         thread_id:     str = "default",
         is_voice:      bool = False,
+        user_id:       int = None,
     ):
         """
         Full pipeline for a user message:
@@ -104,7 +105,7 @@ class NexonCore:
                 try:
                     db = SessionLocal()
                     msg_service = MessageService()
-                    msg_service.add_message(db, int(thread_id), "user", query)
+                    msg_service.add_message(db, int(thread_id), "user", query, user_id=user_id)
                     db.close()
                 except Exception as e:
                     print(f"[NexonCore DB] Error saving user msg: {e}")
@@ -161,7 +162,7 @@ class NexonCore:
                                 db = SessionLocal()
                                 msg_service = MessageService()
                                 content = "Here is your generated image:\n\n" + "\n".join([f"![Image]({url})" for url in image_urls])
-                                msg_service.add_message(db, int(thread_id), "assistant", content)
+                                msg_service.add_message(db, int(thread_id), "assistant", content, user_id=user_id)
                                 db.close()
                             except Exception as e:
                                 pass
@@ -345,7 +346,7 @@ class NexonCore:
                 try:
                     db = SessionLocal()
                     msg_service = MessageService()
-                    msg_service.add_message(db, int(thread_id), "assistant", full_response)
+                    msg_service.add_message(db, int(thread_id), "assistant", full_response, user_id=user_id)
                     db.close()
                 except Exception as e:
                     print(f"[NexonCore DB] Error saving assistant msg: {e}")

@@ -2,17 +2,25 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 
 const STORAGE_KEY = 'nexon_threads'
 
-export function useThreads(token) {
+export function useThreads(token, user) {
   const [threads, setThreads] = useState([])
   const [activeThreadId, setActiveThreadId] = useState(null)
   const [activeMessages, setActiveMessages] = useState([])
   
+  // Use a dynamic storage key based on the user's ID
+  const storageKey = user ? `nexon_threads_${user.id}` : 'nexon_threads'
+
   // Try to load from API first, fallback to localStorage
   useEffect(() => {
     const init = async () => {
-      if (!token) return;
+      if (!token || !user) {
+        setThreads([])
+        setActiveThreadId(null)
+        setActiveMessages([])
+        return
+      }
       try {
-        const res = await fetch('/api/conversations', {
+        const res = await fetch(`/api/users/${user.id}/conversations`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
         if (res.ok) {
@@ -26,7 +34,7 @@ export function useThreads(token) {
               messages: []
             }))
             setThreads(apiThreads)
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(apiThreads))
+            localStorage.setItem(storageKey, JSON.stringify(apiThreads))
             return
           }
         }
@@ -36,16 +44,17 @@ export function useThreads(token) {
       
       // Fallback
       try {
-        const raw = localStorage.getItem(STORAGE_KEY)
+        const raw = localStorage.getItem(storageKey)
         if (raw) setThreads(JSON.parse(raw))
       } catch (e) {}
     }
     init()
-  }, [])
+  }, [token, user])
 
   const createThread = useCallback(async () => {
     try {
-      const res = await fetch('/api/conversations', {
+      if (!user) return null;
+      const res = await fetch(`/api/users/${user.id}/conversations`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -80,12 +89,12 @@ export function useThreads(token) {
     setActiveThreadId(id)
     setActiveMessages([])
     return id
-  }, [])
+  }, [token, user])
 
   const selectThread = useCallback(async (threadId) => {
     setActiveThreadId(String(threadId))
     
-    if (String(threadId).startsWith('thread_')) {
+    if (String(threadId).startsWith('thread_') || !user) {
       // It's a local thread
       const t = threads.find(x => x.id === threadId)
       const msgs = t ? (t.messages || []) : []
@@ -94,7 +103,7 @@ export function useThreads(token) {
     }
 
     try {
-      const res = await fetch(`/api/conversations/${threadId}/messages`, {
+      const res = await fetch(`/api/users/${user.id}/conversations/${threadId}/messages`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       if (res.ok) {
@@ -117,7 +126,7 @@ export function useThreads(token) {
       return prev
     })
     return msgs
-  }, [threads])
+  }, [threads, token, user])
 
   const appendMessage = useCallback((threadId, message) => {
     if (!threadId) return
@@ -140,8 +149,8 @@ export function useThreads(token) {
 
   const deleteThread = useCallback(async (threadId) => {
     try {
-      if (!String(threadId).startsWith('thread_')) {
-        await fetch(`/api/conversations/${threadId}`, { 
+      if (!String(threadId).startsWith('thread_') && user) {
+        await fetch(`/api/users/${user.id}/conversations/${threadId}`, { 
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -156,13 +165,13 @@ export function useThreads(token) {
       }
       return prev
     })
-  }, [])
+  }, [token, user])
 
   const renameThread = useCallback(async (threadId, title) => {
     const newTitle = title.trim() || 'New Chat'
     try {
-      if (!String(threadId).startsWith('thread_')) {
-        await fetch(`/api/conversations/${threadId}`, {
+      if (!String(threadId).startsWith('thread_') && user) {
+        await fetch(`/api/users/${user.id}/conversations/${threadId}`, {
           method: 'PUT',
           headers: { 
             'Content-Type': 'application/json',
@@ -176,21 +185,23 @@ export function useThreads(token) {
     setThreads(prev => prev.map(t =>
       t.id === threadId ? { ...t, title: newTitle, updatedAt: Date.now() } : t
     ))
-  }, [])
+  }, [token, user])
 
   const clearAll = useCallback(() => {
     setThreads([])
     setActiveThreadId(null)
     setActiveMessages([])
-    try { localStorage.removeItem(STORAGE_KEY) } catch (_) {}
-  }, [])
+    try { localStorage.removeItem(storageKey) } catch (_) {}
+  }, [storageKey])
 
   // Write through cache
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(threads))
+      if (user) {
+        localStorage.setItem(storageKey, JSON.stringify(threads))
+      }
     } catch (e) {}
-  }, [threads])
+  }, [threads, storageKey, user])
 
   return {
     threads,

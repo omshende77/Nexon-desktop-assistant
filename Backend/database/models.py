@@ -28,6 +28,7 @@ class Message(Base):
 
     id              = Column(Integer, primary_key=True, index=True)
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id         = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # ownership
     role            = Column(String(20), nullable=False)       # 'user' | 'assistant'
     content         = Column(Text, nullable=False)
     message_type    = Column(String(20), default="text")       # 'text' | 'images' | 'info' | 'error'
@@ -38,6 +39,7 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # ownership
     title       = Column(String(500), nullable=False)
     description = Column(Text, nullable=True)
     completed   = Column(Boolean, default=False, nullable=False)
@@ -51,6 +53,7 @@ class Note(Base):
     __tablename__ = "notes"
 
     id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # ownership
     title      = Column(String(500), nullable=False)
     content    = Column(Text, nullable=False)
     tags       = Column(String(500), nullable=True)            # comma-separated tags
@@ -62,6 +65,7 @@ class Reminder(Base):
     __tablename__ = "reminders"
 
     id          = Column(Integer, primary_key=True, index=True)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # ownership
     text        = Column(String(1000), nullable=False)
     remind_at   = Column(String(100), nullable=True)           # ISO datetime string
     completed   = Column(Boolean, default=False, nullable=False)
@@ -72,6 +76,7 @@ class Memory(Base):
     __tablename__ = "memories"
 
     id         = Column(Integer, primary_key=True, index=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # ownership
     key        = Column(String(200), nullable=False, index=True)   # e.g. "name", "goal", "interest"
     value      = Column(Text, nullable=False)
     category   = Column(String(50), default="general")            # 'preference' | 'goal' | 'fact' | 'general'

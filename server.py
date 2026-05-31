@@ -61,8 +61,10 @@ app.add_middleware(
 )
 
 from Backend.auth_routes import router as auth_router, get_current_user
+from Backend.api_routes.data_routes import router as data_router
 from Backend.database.models import User
 app.include_router(auth_router)
+app.include_router(data_router)
 
 # ── Static File Mounts ────────────────────────────────────────────────────────
 
@@ -189,12 +191,12 @@ async def delete_thread_history(thread_id: str):
 
 
 @app.post("/api/chat/send")
-async def send_message_rest(req: QueryRequest):
+async def send_message_rest(req: QueryRequest, current_user: User = Depends(get_current_user)):
     """REST fallback for sending a message (WebSocket preferred)."""
     if not req.text.strip():
         raise HTTPException(status_code=400, detail="Empty message")
     asyncio.create_task(
-        nexon.process_query(req.text, Username, Assistantname, req.thread_id)
+        nexon.process_query(req.text, current_user.username, Assistantname, req.thread_id, user_id=current_user.id)
     )
     return {"status": "processing", "message": req.text, "thread_id": req.thread_id}
 
@@ -223,41 +225,56 @@ async def get_status():
 
 # ── Database Endpoints ────────────────────────────────────────────────────────
 
-@app.get("/api/conversations")
-def get_conversations(skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@app.get("/api/users/{user_id}/conversations")
+def get_conversations(user_id: int, skip: int = 0, limit: int = 100, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     if not DB_AVAILABLE:
         return {"conversations": [], "status": "ephemeral"}
     service = ConversationService()
     convos = service.get_all_conversations(db, current_user.id)
     return {"conversations": [{"id": c.id, "title": c.title, "created_at": c.created_at, "updated_at": c.updated_at} for c in convos], "status": "persistent"}
 
-@app.post("/api/conversations")
-def create_conversation(req: ConversationCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@app.post("/api/users/{user_id}/conversations")
+def create_conversation(user_id: int, req: ConversationCreateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     if not DB_AVAILABLE:
         return {"id": "default", "title": req.title, "status": "ephemeral"}
     service = ConversationService()
     c = service.create_conversation(db, req.title, current_user.id)
     return {"id": c.id, "title": c.title, "created_at": c.created_at, "updated_at": c.updated_at}
 
-@app.get("/api/conversations/{conversation_id}/messages")
-def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@app.get("/api/users/{user_id}/conversations/{conversation_id}/messages")
+def get_conversation_messages(user_id: int, conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     if not DB_AVAILABLE or conversation_id == "default":
         return {"messages": [], "status": "ephemeral"}
+        
+    conv_service = ConversationService()
+    conv = conv_service.get_conversation(db, int(conversation_id), current_user.id)
+    if not conv:
+        raise HTTPException(status_code=403, detail="Not authorized to access this conversation")
+        
     service = MessageService()
-    # TODO: ideally verify that this conversation belongs to the user
     msgs = service.get_conversation_history(db, int(conversation_id))
     return {"messages": [{"id": m.id, "role": m.role, "content": m.content, "type": m.message_type, "created_at": m.created_at} for m in msgs], "status": "persistent"}
 
-@app.put("/api/conversations/{conversation_id}")
-def update_conversation(conversation_id: str, req: ConversationUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@app.put("/api/users/{user_id}/conversations/{conversation_id}")
+def update_conversation(user_id: int, conversation_id: str, req: ConversationUpdateRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     if not DB_AVAILABLE or conversation_id == "default":
         return {"status": "ephemeral"}
     service = ConversationService()
     c = service.update_title(db, int(conversation_id), req.title, current_user.id)
     return {"id": c.id, "title": c.title, "updated_at": c.updated_at}
 
-@app.delete("/api/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@app.delete("/api/users/{user_id}/conversations/{conversation_id}")
+def delete_conversation(user_id: int, conversation_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
     if not DB_AVAILABLE or conversation_id == "default":
         return {"status": "ephemeral"}
     service = ConversationService()
@@ -270,7 +287,7 @@ def delete_conversation(conversation_id: str, db: Session = Depends(get_db), cur
 # ── WebSocket Endpoint ────────────────────────────────────────────────────────
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
+async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
     await manager.connect(websocket)
 
     # Initial handshake
@@ -286,21 +303,47 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         print(f"[WS] Init error: {e}")
 
+    authenticated_user = None
+
     try:
         while True:
             data     = await websocket.receive_json()
             msg_type = data.get("type")
 
-            if msg_type == "query":
+            if msg_type == "auth":
+                token = data.get("token")
+                try:
+                    from jose import jwt
+                    from Backend.database.services.auth_service import SECRET_KEY, ALGORITHM, get_user
+                    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+                    username = payload.get("sub")
+                    if username:
+                        user = get_user(db, username=username)
+                        if user:
+                            authenticated_user = user
+                            await websocket.send_json({"type": "auth_success", "username": username})
+                        else:
+                            await websocket.send_json({"type": "error", "message": "Invalid user"})
+                    else:
+                        await websocket.send_json({"type": "error", "message": "Invalid token"})
+                except Exception as e:
+                    await websocket.send_json({"type": "error", "message": f"Auth failed: {e}"})
+
+            elif msg_type == "query":
+                if not authenticated_user:
+                    await websocket.send_json({"type": "error", "message": "Unauthorized. Please authenticate first."})
+                    continue
                 text      = data.get("text", "").strip()
                 thread_id = data.get("thread_id", "default")
                 is_voice  = data.get("is_voice", False)
                 if text:
                     asyncio.create_task(
-                        nexon.process_query(text, Username, Assistantname, thread_id, is_voice)
+                        nexon.process_query(text, authenticated_user.username, Assistantname, thread_id, is_voice, authenticated_user.id)
                     )
 
             elif msg_type == "sync_thread":
+                if not authenticated_user:
+                    continue
                 # Frontend sends history when switching to an existing thread
                 thread_id = data.get("thread_id", "default")
                 messages  = data.get("messages", [])
@@ -313,6 +356,8 @@ async def websocket_endpoint(websocket: WebSocket):
                 })
 
             elif msg_type == "delete_thread":
+                if not authenticated_user:
+                    continue
                 thread_id = data.get("thread_id", "")
                 if thread_id:
                     from Backend.AIService import clear_thread_history

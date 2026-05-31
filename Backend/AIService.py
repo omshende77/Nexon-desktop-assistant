@@ -126,21 +126,31 @@ _init_clients()
 
 _thread_histories: dict[str, list[dict]] = {}
 
-def get_thread_history(thread_id: str) -> list[dict]:
-    return _thread_histories.get(thread_id, [])
+def _user_thread_key(username: str, thread_id: str) -> str:
+    """Combine username and thread_id to create a unique key for storing history per user."""
+    return f"{username}:{thread_id}"
 
-def append_to_thread(thread_id: str, role: str, text: str):
-    if thread_id not in _thread_histories:
-        _thread_histories[thread_id] = []
-    _thread_histories[thread_id].append({
+def get_thread_history(thread_id: str, username: str) -> list[dict]:
+    key = _user_thread_key(username, thread_id)
+    return _thread_histories.get(key, [])
+
+def append_to_thread(thread_id: str, username: str, role: str, text: str):
+    key = _user_thread_key(username, thread_id)
+    if key not in _thread_histories:
+        _thread_histories[key] = []
+    _thread_histories[key].append({
         "role": role,
         "parts": [{"text": text}],
     })
+    return
 
-def clear_thread_history(thread_id: str):
-    _thread_histories.pop(thread_id, None)
 
-def load_thread_history_from_messages(thread_id: str, messages: list[dict]):
+def clear_thread_history(thread_id: str, username: str):
+    key = _user_thread_key(username, thread_id)
+    _thread_histories.pop(key, None)
+
+def load_thread_history_from_messages(thread_id: str, username: str, messages: list[dict]):
+    key = _user_thread_key(username, thread_id)
     history = []
     for msg in messages:
         gemini_role = "user" if msg.get("role") == "user" else "model"
@@ -150,7 +160,7 @@ def load_thread_history_from_messages(thread_id: str, messages: list[dict]):
                 "role": gemini_role,
                 "parts": [{"text": content}],
             })
-    _thread_histories[thread_id] = history
+    _thread_histories[key] = history
 
 def _history_to_groq_format(gemini_history: list[dict]) -> list[dict]:
     groq_hist = []
@@ -168,7 +178,7 @@ async def _stream_gemini_fallback(query: str, thread_id: str) -> AsyncGenerator[
         yield f"GROQ FAILED. KEY PRESENT={bool(GROQ_API_KEY)}"
         return
 
-    history = get_thread_history(thread_id)
+    history = get_thread_history(thread_id, username)
     chat_history = history[:-1] if len(history) > 1 else []
     
     try:
@@ -188,7 +198,7 @@ async def _stream_gemini_fallback(query: str, thread_id: str) -> AsyncGenerator[
                 yield chunk.text
 
         if full_response:
-            append_to_thread(thread_id, "model", full_response)
+            append_to_thread(thread_id, username, "model", full_response)
 
     except Exception as e:
         yield f"\n\n⚠️ Gemini fallback failed: {str(e)}"
@@ -206,8 +216,8 @@ async def stream_chat_response(
     print("GROQ KEY:", bool(GROQ_API_KEY))
     print("GEMINI KEY:", bool(GEMINI_API_KEY))
     
-    append_to_thread(thread_id, "user", query)
-    history = get_thread_history(thread_id)
+    append_to_thread(thread_id, username, "user", query)
+    history = get_thread_history(thread_id, username)
     chat_history = history[:-1] if len(history) > 1 else []
 
     # 1. Try Groq first (lightning fast, reliable)
@@ -235,7 +245,7 @@ async def stream_chat_response(
                     yield text
                     
             if full_response:
-                append_to_thread(thread_id, "model", full_response)
+                append_to_thread(thread_id, username, "model", full_response)
             return
 
         except Exception as e:

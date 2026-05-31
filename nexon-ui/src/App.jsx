@@ -53,7 +53,7 @@ export default function App() {
     appendMessage,
     deleteThread,
     renameThread,
-  } = useThreads(token)
+  } = useThreads(token, user)
 
   // Use refs to expose latest versions to callbacks defined before they exist
   const activeThreadIdRef = useRef(activeThreadId)
@@ -105,7 +105,7 @@ export default function App() {
     sendQuery,
     sendRaw,
     syncThread,
-  } = useWebSocket(WS_URL, {
+  } = useWebSocket(WS_URL, token, {
     onAppendMessage: useCallback((msg) => {
       const tid = activeThreadIdRef.current
       if (tid) appendMessageRef.current?.(tid, msg)

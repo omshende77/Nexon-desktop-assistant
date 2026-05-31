@@ -2,12 +2,13 @@ from sqlalchemy.orm import Session
 from ..models import Message
 
 class MessageRepository:
-    def create(self, db: Session, conversation_id: int, role: str, content: str, message_type: str = "text") -> Message:
+    def create(self, db: Session, conversation_id: int, role: str, content: str, message_type: str = "text", user_id: int = None) -> Message:
         db_msg = Message(
             conversation_id=conversation_id,
             role=role,
             content=content,
-            message_type=message_type
+            message_type=message_type,
+            user_id=user_id
         )
         db.add(db_msg)
         db.commit()

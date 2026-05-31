@@ -22,6 +22,16 @@ def get_password_hash(password):
 def get_user(db: Session, username: str):
     return db.query(User).filter(User.username == username).first()
 
+def create_user(db: Session, username: str, email: Optional[str], password: str):
+    if len(password) < 8:
+        raise ValueError('Password must be at least 8 characters long')
+    hashed = get_password_hash(password)
+    user = User(username=username, email=email if email else None, hashed_password=hashed)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:

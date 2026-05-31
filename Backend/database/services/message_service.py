@@ -8,7 +8,7 @@ class MessageService:
         self.repo = MessageRepository()
         self.conv_service = ConversationService()
 
-    def add_message(self, db: Session, conversation_id: int, role: str, content: str, message_type: str = "text"):
+    def add_message(self, db: Session, conversation_id: int, role: str, content: str, message_type: str = "text", user_id: int = None):
         # Auto-generate title if this is the first user message
         if role == 'user':
             messages = self.repo.get_by_conversation(db, conversation_id)
@@ -17,9 +17,9 @@ class MessageService:
                 title_content = content.replace("\n", " ")[:40]
                 if len(content) > 40:
                     title_content += "..."
-                self.conv_service.update_title(db, conversation_id, title_content)
+                self.conv_service.update_title(db, conversation_id, title_content, user_id=user_id)
 
-        return self.repo.create(db, conversation_id, role, content, message_type)
+        return self.repo.create(db, conversation_id, role, content, message_type, user_id=user_id)
 
     def get_conversation_history(self, db: Session, conversation_id: int):
         return self.repo.get_by_conversation(db, conversation_id)
