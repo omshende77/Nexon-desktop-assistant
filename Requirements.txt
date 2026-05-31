@@ -47,3 +47,6 @@ PyQt5
 # ── REMOVED (replaced by Gemini) ──────────────────────────────────────────────
 # groq           ← was used for LLaMA chat generation
 # cohere         ← was used for query classification (DMM)
+
+
+ddgs>=9.14.4
