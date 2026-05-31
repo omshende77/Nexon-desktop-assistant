@@ -241,7 +241,7 @@ def get_conversation_messages(conversation_id: str, db: Session = Depends(get_db
         return {"messages": [], "status": "ephemeral"}
     service = MessageService()
     msgs = service.get_conversation_history(db, int(conversation_id))
-    return {"messages": [{"id": m.id, "role": m.role, "content": m.content, "type": m.message_type, "created_at": m.created_at} for m in msgs]}
+    return {"messages": [{"id": m.id, "role": m.role, "content": m.content, "type": m.message_type, "created_at": m.created_at} for m in msgs], "status": "persistent"}
 
 @app.put("/api/conversations/{conversation_id}")
 def update_conversation(conversation_id: str, req: ConversationUpdateRequest, db: Session = Depends(get_db)):

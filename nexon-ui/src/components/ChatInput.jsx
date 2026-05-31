@@ -32,9 +32,19 @@ export default function ChatInput({ onSend, isProcessing, config, isVoiceSession
   }, [text, isProcessing, onSend])
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
+    if (e.key === 'Enter') {
+      if (!e.shiftKey) {
+        e.preventDefault()
+        handleSend()
+      } else {
+        // Allow default new line, but ensure textarea resizes immediately
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 160) + 'px'
+          }
+        }, 0)
+      }
     }
   }
 

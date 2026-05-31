@@ -2,7 +2,7 @@
 Search.py — DuckDuckGo real-time web search tool for Nexon AI.
 """
 
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 def get_realtime_search_results(query: str, max_results: int = 4) -> str:
     """

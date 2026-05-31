@@ -100,6 +100,7 @@ export default function App() {
     config,
     sendQuery,
     sendRaw,
+    syncThread,
   } = useWebSocket(WS_URL, {
     onAppendMessage: useCallback((msg) => {
       const tid = activeThreadIdRef.current
@@ -130,10 +131,13 @@ export default function App() {
   }, [ensureThread, sendQuery])
 
   // ── Handle thread selection ──────────────────────────────────────────────
-  const handleSelectThread = useCallback((threadId) => {
-    selectThread(threadId)
+  const handleSelectThread = useCallback(async (threadId) => {
+    const msgs = await selectThread(threadId)
+    if (msgs && msgs.length > 0) {
+      syncThread(threadId, msgs)
+    }
     setActiveScreen('chat')
-  }, [selectThread])
+  }, [selectThread, syncThread])
 
   // ── Sidebar toggle ────────────────────────────────────────────────────────
   const handleSidebarToggle = useCallback(() => setSidebarOpen(v => !v), [])

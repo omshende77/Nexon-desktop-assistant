@@ -49,17 +49,19 @@ export function useThreads() {
       })
       if (res.ok) {
         const data = await res.json()
-        const newThread = {
-          id: String(data.id),
-          title: data.title,
-          updatedAt: Date.now(),
-          createdAt: Date.now(),
-          messages: []
+        if (data.status !== 'ephemeral') {
+          const newThread = {
+            id: String(data.id),
+            title: data.title,
+            updatedAt: Date.now(),
+            createdAt: Date.now(),
+            messages: []
+          }
+          setThreads(prev => [newThread, ...prev])
+          setActiveThreadId(String(data.id))
+          setActiveMessages([])
+          return String(data.id)
         }
-        setThreads(prev => [newThread, ...prev])
-        setActiveThreadId(String(data.id))
-        setActiveMessages([])
-        return String(data.id)
       }
     } catch (e) {
       console.warn('[Threads] Failed to create thread via API', e)
@@ -80,8 +82,9 @@ export function useThreads() {
     if (String(threadId).startsWith('thread_')) {
       // It's a local thread
       const t = threads.find(x => x.id === threadId)
-      setActiveMessages(t ? t.messages : [])
-      return
+      const msgs = t ? (t.messages || []) : []
+      setActiveMessages(msgs)
+      return msgs
     }
 
     try {
@@ -90,7 +93,7 @@ export function useThreads() {
         const data = await res.json()
         if (data.status === 'persistent') {
           setActiveMessages(data.messages)
-          return
+          return data.messages
         }
       }
     } catch (e) {
@@ -98,11 +101,14 @@ export function useThreads() {
     }
     
     // Fallback: look in local memory
+    let msgs = []
     setThreads(prev => {
       const t = prev.find(x => x.id === threadId)
-      if (t) setActiveMessages(t.messages || [])
+      if (t) msgs = t.messages || []
+      setActiveMessages(msgs)
       return prev
     })
+    return msgs
   }, [threads])
 
   const appendMessage = useCallback((threadId, message) => {
@@ -119,7 +125,8 @@ export function useThreads() {
       if (title === 'New Chat' && message.role === 'user' && message.content) {
         title = message.content.slice(0, 42) + (message.content.length > 42 ? '…' : '')
       }
-      return { ...t, title, updatedAt: Date.now() }
+      const newMessages = t.messages ? [...t.messages, message] : [message]
+      return { ...t, title, updatedAt: Date.now(), messages: newMessages }
     }))
   }, [activeThreadId])
 

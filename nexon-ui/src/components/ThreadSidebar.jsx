@@ -134,6 +134,7 @@ export default function ThreadSidebar({
 
 function ThreadItem({ thread, isActive, onSelect, onDelete, onRename }) {
   const [isEditing, setEditing] = useState(false)
+  const [isConfirmingDelete, setConfirmingDelete] = useState(false)
   const [editTitle, setEditTitle] = useState(thread.title)
   const inputRef = useRef(null)
 
@@ -155,6 +156,11 @@ function ThreadItem({ thread, isActive, onSelect, onDelete, onRename }) {
     if (e.key === 'Escape') { setEditing(false); setEditTitle(thread.title) }
   }
 
+  // Hide confirmation if mouse leaves the thread item
+  const handleMouseLeave = () => {
+    if (isConfirmingDelete) setConfirmingDelete(false)
+  }
+
   return (
     <motion.div
       className={`relative group flex items-center gap-2 px-3 py-2.5 rounded-xl
@@ -163,7 +169,8 @@ function ThreadItem({ thread, isActive, onSelect, onDelete, onRename }) {
                     ? 'bg-violet-500/15 border border-violet-500/25 text-slate-100'
                     : 'hover:bg-white/4 border border-transparent text-slate-400 hover:text-slate-200'
                   }`}
-      onClick={!isEditing ? onSelect : undefined}
+      onClick={!isEditing && !isConfirmingDelete ? onSelect : undefined}
+      onMouseLeave={handleMouseLeave}
       whileHover={{ x: 2 }}
       layout
     >
@@ -194,7 +201,7 @@ function ThreadItem({ thread, isActive, onSelect, onDelete, onRename }) {
       </div>
 
       {/* Action buttons — only on hover */}
-      {!isEditing && (
+      {!isEditing && !isConfirmingDelete && (
         <div className="hidden group-hover:flex items-center gap-1 shrink-0">
           <button
             onClick={e => { e.stopPropagation(); setEditing(true) }}
@@ -204,11 +211,35 @@ function ThreadItem({ thread, isActive, onSelect, onDelete, onRename }) {
             ✎
           </button>
           <button
-            onClick={e => { e.stopPropagation(); onDelete() }}
+            onClick={e => { 
+              e.stopPropagation(); 
+              setConfirmingDelete(true)
+            }}
             className="w-5 h-5 flex items-center justify-center rounded text-slate-500 hover:text-red-400 transition-colors"
             title="Delete"
           >
             🗑
+          </button>
+        </div>
+      )}
+
+      {/* Inline Delete Confirmation */}
+      {isConfirmingDelete && (
+        <div className="flex items-center gap-1 shrink-0 bg-red-500/20 px-1 py-0.5 rounded shadow-sm border border-red-500/30">
+          <span className="text-[10px] text-red-300 font-semibold px-1">Delete?</span>
+          <button
+            onClick={e => { e.stopPropagation(); onDelete() }}
+            className="w-5 h-5 flex items-center justify-center rounded text-red-200 hover:bg-red-500 hover:text-white transition-colors text-[10px]"
+            title="Confirm Delete"
+          >
+            ✓
+          </button>
+          <button
+            onClick={e => { e.stopPropagation(); setConfirmingDelete(false) }}
+            className="w-5 h-5 flex items-center justify-center rounded text-slate-400 hover:bg-slate-700 hover:text-white transition-colors text-[10px]"
+            title="Cancel"
+          >
+            ✕
           </button>
         </div>
       )}

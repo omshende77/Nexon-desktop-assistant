@@ -15,6 +15,9 @@ SessionLocal = None
 try:
     if DATABASE_URL:
         engine = create_engine(DATABASE_URL)
+        # Eagerly test the connection
+        with engine.connect() as conn:
+            pass
         SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
         DB_AVAILABLE = True
         print("[Database] Successfully configured PostgreSQL connection.")
@@ -22,6 +25,9 @@ try:
         print("[Database] Warning: DATABASE_URL not found in .env. Running in ephemeral mode.")
 except Exception as e:
     print(f"[Database] Error configuring database: {e}. Running in ephemeral mode.")
+    DB_AVAILABLE = False
+    engine = None
+    SessionLocal = None
 
 Base = declarative_base()
 

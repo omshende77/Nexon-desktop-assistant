@@ -32,7 +32,7 @@ Username      = env_vars.get("Username",      "User")
 Assistantname = env_vars.get("Assistantname", "Nexon")
 
 # Task prefixes the DMM can return
-TASK_FUNCTIONS = ["open", "close", "play", "system", "content", "google search", "youtube search"]
+TASK_FUNCTIONS = ["open", "close", "play", "system", "content", "youtube search"]
 
 
 class NexonCore:
@@ -122,12 +122,18 @@ class NexonCore:
                 decision = [f"general {query}"]
 
             G = any(i.startswith("general")  for i in decision)
-            R = any(i.startswith("realtime") for i in decision)
+            R = any(i.startswith("realtime") or i.startswith("google search") for i in decision)
 
-            merged_query = " and ".join(
-                " ".join(i.split()[1:]) for i in decision
-                if i.startswith("general") or i.startswith("realtime")
-            ) or query
+            query_parts = []
+            for i in decision:
+                if i.startswith("general"):
+                    query_parts.append(i.replace("general", "").strip())
+                elif i.startswith("realtime"):
+                    query_parts.append(i.replace("realtime", "").strip())
+                elif i.startswith("google search"):
+                    query_parts.append(i.replace("google search", "").strip())
+                    
+            merged_query = " and ".join(filter(bool, query_parts)) or query
 
             # ── Step 2: Image generation ───────────────────────────────────
             for q in decision:
@@ -230,9 +236,9 @@ class NexonCore:
                             assistantname=assistantname,
                         )
                         break
-                    elif q.startswith("realtime"):
+                    elif q.startswith("realtime") or q.startswith("google search"):
                         await self.broadcast({"type": "status", "value": "Searching the web..."})
-                        qf = q.replace("realtime", "").strip() or query
+                        qf = q.replace("realtime", "").replace("google search", "").strip() or query
                         from Backend.Search import get_realtime_search_results
                         loop = asyncio.get_event_loop()
                         web_data = await loop.run_in_executor(None, get_realtime_search_results, qf)
