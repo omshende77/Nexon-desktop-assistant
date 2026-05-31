@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 from jose import JWTError, jwt
 
 from .database.config import get_db
@@ -24,13 +24,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 class UserCreate(BaseModel):
     username: str
-    email: str = None
+    email: Optional[str] = None
     password: str
 
 class UserResponse(BaseModel):
     id: int
     username: str
-    email: str = None
+    email: Optional[str] = None
     
     class Config:
         orm_mode = True
@@ -60,19 +60,36 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_scheme)], db: Se
 
 @router.post("/register", response_model=UserResponse)
 def register(user_data: UserCreate, db: Session = Depends(get_db)):
+
+    email = user_data.email.strip() if user_data.email else None
+
     db_user = get_user(db, username=user_data.username)
     if db_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
-    if user_data.email:
-        email_check = db.query(User).filter(User.email == user_data.email).first()
+        raise HTTPException(
+            status_code=400,
+            detail="Username already registered"
+        )
+
+    if email:
+        email_check = db.query(User).filter(User.email == email).first()
         if email_check:
-            raise HTTPException(status_code=400, detail="Email already registered")
-            
+            raise HTTPException(
+                status_code=400,
+                detail="Email already registered"
+            )
+
     hashed_password = get_password_hash(user_data.password)
-    new_user = User(username=user_data.username, email=user_data.email, hashed_password=hashed_password)
+
+    new_user = User(
+        username=user_data.username,
+        email=email,  # <-- use cleaned email
+        hashed_password=hashed_password
+    )
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+
     return new_user
 
 @router.post("/login", response_model=Token)

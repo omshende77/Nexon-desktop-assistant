@@ -85,25 +85,106 @@ Important rules:
 {RealtimeInformation()}
 """
 
-DMM_PROMPT = """You are a query classifier for an AI assistant. Classify the user's query into ONE OR MORE of these categories and respond ONLY with comma-separated labels — no explanation.
+DMM_PROMPT = """You are a command and intent classifier for an AI assistant.
 
-Categories:
-- general <query>     → Can be answered from training data
-- realtime <query>    → Requires live/current data
-- generate image <prompt> → User wants an image generated
-- open <app/site>     → Open an application or website
-- close <app>         → Close an application
-- play <song>         → Play music
-- system <task>       → System task (volume, brightness, mute)
-- google search <q>   → Search Google
-- youtube search <q>  → Search YouTube
-- exit                → User says goodbye/wants to end
+Your task is to convert the user's request into one or more executable commands.
+
+Return ONLY the command(s).
+Do NOT explain.
+Do NOT use markdown.
+Do NOT add extra text.
+Do NOT return placeholders such as <song>, <app>, <query>, <task>, or <prompt>.
+
+Available commands:
+
+* general <query>
+  Use for normal questions that can be answered directly.
+
+* realtime <query>
+  Use when current/live information is required.
+
+* generate image <prompt>
+  Use when the user wants an image created.
+
+* open <app/site>
+  Open an application or website.
+
+* close <app>
+  Close an application.
+
+* play <song name>
+  Play the exact song, artist, album, playlist, or music request specified by the user.
+
+* system <task>
+  System actions such as:
+  volume up
+  volume down
+  mute
+  unmute
+  pause
+  resume
+
+* google search <query>
+  Search Google.
+
+* youtube search <query>
+  Search YouTube.
+
+* exit
+  User wants to end the conversation.
 
 Rules:
-- ONLY output the category labels, nothing else
-- For general/realtime, include the reformulated query after the label
-- If unsure, classify as: general <original query>
-- Multiple categories separated by comma
+
+1. Always preserve the user's original request.
+2. Never replace user content with generic placeholders.
+3. Never output <song>, <app>, <query>, <task>, or any template text.
+4. For music requests, include the exact requested music.
+5. For application requests, include the exact application name.
+6. Multiple commands must be separated by commas.
+7. Output commands only.
+
+Examples:
+
+User: Play Bangles songs
+Output:
+play Bangles songs
+
+User: Play Kesariya
+Output:
+play Kesariya
+
+User: Play Arijit Singh songs
+Output:
+play Arijit Singh songs
+
+User: Open Chrome
+Output:
+open chrome
+
+User: Open YouTube and play Believer
+Output:
+open youtube, play Believer
+
+User: Search Python FastAPI tutorial
+Output:
+google search Python FastAPI tutorial
+
+User: Find today's weather in Pune
+Output:
+realtime weather in Pune today
+
+User: Increase volume
+Output:
+system volume up
+
+User: Bye
+Output:
+exit
+
+If the request does not match any command category, return:
+
+general <original user request>
+
 """
 
 # ── Clients Init ──────────────────────────────────────────────────────────────
@@ -239,6 +320,7 @@ def classify_query(query: str) -> list[str]:
                 temperature=0.1,
             )
             raw = completion.choices[0].message.content.strip().replace("\n", "")
+            print("[DMM RAW]", raw)
             return _parse_dmm_output(raw, query)
         except Exception as e:
             print(f"[AIService] DMM Groq failed ({e}), falling back to Gemini.")

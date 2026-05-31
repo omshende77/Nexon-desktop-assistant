@@ -280,7 +280,7 @@ def delete_conversation(user_id: int, conversation_id: str, db: Session = Depend
     service = ConversationService()
     service.delete_conversation(db, int(conversation_id), current_user.id)
     from Backend.AIService import clear_thread_history
-    clear_thread_history(conversation_id)
+    clear_thread_history(str(conversation_id), current_user.username)
     return {"status": "deleted", "id": conversation_id}
 
 

@@ -5,10 +5,12 @@ Handles 'open', 'close', 'play', 'system', 'google search', 'youtube search' tas
 
 import os
 import asyncio
+import webbrowser
+from urllib.parse import quote_plus
 from AppOpener import open as open_app, close as close_app
-import pywhatkit
 import keyboard
 import time
+import pywhatkit
 
 async def Automation(commands: list[str]):
     """
@@ -18,13 +20,13 @@ async def Automation(commands: list[str]):
         try:
             if cmd.startswith("open "):
                 target = cmd.replace("open ", "").strip()
-                # Use pywhatkit for known web platforms, AppOpener for desktop apps
+                # Use webbrowser for known web platforms, AppOpener for desktop apps
                 if target in ["google", "chrome"]:
-                    pywhatkit.search("")
+                    webbrowser.open("https://www.google.com")
                 elif target in ["youtube"]:
-                    pywhatkit.playonyt("")
+                    webbrowser.open("https://www.youtube.com")
                 elif target in ["facebook", "instagram", "whatsapp"]:
-                    os.system(f"start https://{target}.com")
+                    webbrowser.open(f"https://{target}.com")
                 else:
                     open_app(target, match_closest=True)
 
@@ -34,15 +36,18 @@ async def Automation(commands: list[str]):
 
             elif cmd.startswith("play "):
                 song = cmd.replace("play ", "").strip()
+
+                print(f"[PLAY REQUEST] {song}")
+
                 pywhatkit.playonyt(song)
 
             elif cmd.startswith("google search "):
                 query = cmd.replace("google search ", "").strip()
-                pywhatkit.search(query)
+                webbrowser.open(f"https://www.google.com/search?q={quote_plus(query)}")
 
             elif cmd.startswith("youtube search "):
                 query = cmd.replace("youtube search ", "").strip()
-                pywhatkit.playonyt(query)
+                webbrowser.open(f"https://www.youtube.com/results?search_query={quote_plus(query)}")
 
             elif cmd.startswith("system "):
                 task = cmd.replace("system ", "").strip()
