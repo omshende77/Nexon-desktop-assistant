@@ -237,6 +237,7 @@ class NexonCore:
                     thread_id=thread_id,
                     username=username,
                     assistantname=assistantname,
+                    user_id=user_id,
                 )
 
             else:
@@ -250,6 +251,7 @@ class NexonCore:
                             thread_id=thread_id,
                             username=username,
                             assistantname=assistantname,
+                            user_id=user_id,
                         )
                         break
                     elif q.startswith("realtime") or q.startswith("google search"):
@@ -265,6 +267,7 @@ class NexonCore:
                             thread_id=thread_id,
                             username=username,
                             assistantname=assistantname,
+                            user_id=user_id,
                         )
                         break
                     elif q.startswith("exit"):
@@ -273,6 +276,7 @@ class NexonCore:
                             thread_id=thread_id,
                             username=username,
                             assistantname=assistantname,
+                            user_id=user_id,
                         )
                         await self.broadcast({"type": "exit"})
                         break
@@ -302,6 +306,7 @@ class NexonCore:
         thread_id:     str,
         username:      str,
         assistantname: str,
+        user_id:       int = None,
     ) -> str:
         """
         Stream Gemini tokens via WebSocket, then send the full message at end.

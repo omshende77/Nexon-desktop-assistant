@@ -30,7 +30,7 @@ class Message(Base):
     conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id         = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)  # ownership
     role            = Column(String(20), nullable=False)       # 'user' | 'assistant'
-    content         = Column(Text, nullable=False)
+    content         = Column('conten', Text, nullable=False)       # 'text' | 'images' | 'info' | 'error'
     message_type    = Column(String(20), default="text")       # 'text' | 'images' | 'info' | 'error'
     created_at      = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 

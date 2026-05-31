@@ -176,7 +176,7 @@ async def sync_thread_history(req: ThreadSyncRequest):
     """
     try:
         from Backend.AIService import load_thread_history_from_messages
-        load_thread_history_from_messages(req.thread_id, req.messages)
+        load_thread_history_from_messages(req.thread_id, "default", req.messages)
         return {"status": "ok", "thread_id": req.thread_id, "synced": len(req.messages)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -348,7 +348,8 @@ async def websocket_endpoint(websocket: WebSocket, db: Session = Depends(get_db)
                 thread_id = data.get("thread_id", "default")
                 messages  = data.get("messages", [])
                 from Backend.AIService import load_thread_history_from_messages
-                load_thread_history_from_messages(thread_id, messages)
+                uname = authenticated_user.username if authenticated_user else "default"
+                load_thread_history_from_messages(thread_id, uname, messages)
                 await websocket.send_json({
                     "type":      "thread_synced",
                     "thread_id": thread_id,

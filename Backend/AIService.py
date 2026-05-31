@@ -47,7 +47,7 @@ ASSISTANT_NAME = os.getenv(
 )
 
 # Models
-GROQ_MODEL_NAME       = "llama-3.3-70b-versatile"
+GROQ_MODEL_NAME       = "llama-3.1-8b-instant"
 GEMINI_MODEL_NAME     = "gemini-2.0-flash"
 
 # ── Prompts ───────────────────────────────────────────────────────────────────
@@ -170,38 +170,7 @@ def _history_to_groq_format(gemini_history: list[dict]) -> list[dict]:
         groq_hist.append({"role": role, "content": text})
     return groq_hist
 
-# ── Fallbacks ─────────────────────────────────────────────────────────────────
-
-async def _stream_gemini_fallback(query: str, thread_id: str) -> AsyncGenerator[str, None]:
-    """Stream via Gemini if Groq fails."""
-    if not GEMINI_API_KEY:
-        yield f"GROQ FAILED. KEY PRESENT={bool(GROQ_API_KEY)}"
-        return
-
-    history = get_thread_history(thread_id, username)
-    chat_history = history[:-1] if len(history) > 1 else []
-    
-    try:
-        model = genai.GenerativeModel(
-            model_name=GEMINI_MODEL_NAME,
-            system_instruction=get_system_prompt(),
-        )
-        chat = model.start_chat(history=chat_history)
-        response = await asyncio.to_thread(
-            lambda: chat.send_message(query, stream=True)
-        )
-
-        full_response = ""
-        for chunk in response:
-            if chunk.text:
-                full_response += chunk.text
-                yield chunk.text
-
-        if full_response:
-            append_to_thread(thread_id, username, "model", full_response)
-
-    except Exception as e:
-        yield f"\n\n⚠️ Gemini fallback failed: {str(e)}"
+# ── Groq Only ─────────────────────────────────────────────────────────────────
 
 # ── Core: Streaming Chat ──────────────────────────────────────────────────────
 
@@ -211,51 +180,41 @@ async def stream_chat_response(
     username: str = None,
     assistantname: str = None,
 ) -> AsyncGenerator[str, None]:
-    print("STREAM_CHAT_RESPONSE CALLED")
-    print("GROQ CLIENT:", groq_client)
-    print("GROQ KEY:", bool(GROQ_API_KEY))
-    print("GEMINI KEY:", bool(GEMINI_API_KEY))
-    
+    if not groq_client:
+        yield "⚠️ Groq is not configured. Please check your GroqAPIKey in the .env file."
+        return
+
     append_to_thread(thread_id, username, "user", query)
     history = get_thread_history(thread_id, username)
     chat_history = history[:-1] if len(history) > 1 else []
 
-    # 1. Try Groq first (lightning fast, reliable)
-    if groq_client:
-        print("USING GROQ")
-        groq_messages = [{"role": "system", "content": get_system_prompt()}] + _history_to_groq_format(chat_history)
-        groq_messages.append({"role": "user", "content": query})
+    groq_messages = [{"role": "system", "content": get_system_prompt()}] + _history_to_groq_format(chat_history)
+    groq_messages.append({"role": "user", "content": query})
 
-        try:
-            completion = await asyncio.to_thread(
-                lambda: groq_client.chat.completions.create(
-                    model=GROQ_MODEL_NAME,
-                    messages=groq_messages,
-                    max_tokens=2048,
-                    temperature=0.7,
-                    stream=True,
-                )
+    try:
+        completion = await asyncio.to_thread(
+            lambda: groq_client.chat.completions.create(
+                model=GROQ_MODEL_NAME,
+                messages=groq_messages,
+                max_tokens=2048,
+                temperature=0.7,
+                stream=True,
             )
+        )
 
-            full_response = ""
-            for chunk in completion:
-                if chunk.choices[0].delta.content:
-                    text = chunk.choices[0].delta.content
-                    full_response += text
-                    yield text
-                    
-            if full_response:
-                append_to_thread(thread_id, username, "model", full_response)
-            return
+        full_response = ""
+        for chunk in completion:
+            if chunk.choices[0].delta.content:
+                text = chunk.choices[0].delta.content
+                full_response += text
+                yield text
 
-        except Exception as e:
-            print(f"[AIService] Groq stream failed ({e}), falling back to Gemini.")
-            print("GROQ ERROR:", str(e))
-            yield "[FALLBACK_TRIGGERED]"
+        if full_response:
+            append_to_thread(thread_id, username, "model", full_response)
 
-    # 2. Fallback to Gemini
-    async for token in _stream_gemini_fallback(query, thread_id):
-        yield token
+    except Exception as e:
+        print(f"[AIService] Groq stream failed: {e}")
+        yield f"⚠️ Error generating response: {str(e)}"
 
 async def get_chat_response(query: str, thread_id: str) -> str:
     full = ""
