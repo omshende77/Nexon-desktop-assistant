@@ -38,6 +38,7 @@ passlib[bcrypt]
 bcrypt<4.0.0
 pyjwt
 python-multipart
+python-jose[cryptography]
 
 
 # ── Desktop GUI (legacy desktop app — not used by web server) ─────────────────
